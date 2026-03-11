@@ -156,10 +156,6 @@ The pre-sample diagnostic at the start of each encode predicts this automaticall
 - [x] Resolution-independent 2× and 4× decoder
 - [x] Corrected binary .frac file format
 - [ ] Rigorous upscaling benchmark vs bicubic / Lanczos / EDSR
-- [ ] CNN sharpness recovery decoder (hybrid fractal-CNN pipeline)
-- [ ] arXiv preprint
-- [ ] Unity / Godot game engine texture plugin
-- [ ] Video temporal compression (cross-frame domain search)
 
 ---
 
