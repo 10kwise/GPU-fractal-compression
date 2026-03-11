@@ -43,7 +43,7 @@ PSNR above 35 dB is considered good quality for natural photographs. The system 
 
 ---
 
-### Resolution-Independent Decoding — Same File, Three Resolutions
+### Resolution-Independent Decoding — Same File, Scale to 2x and 4x
 
 <!-- Replace the placeholder below with your upscale comparison image -->
 <!-- Suggested: three crops at 1×, 2×, 4× from the same .frac file, side by side -->
@@ -53,7 +53,7 @@ PSNR above 35 dB is considered good quality for natural photographs. The system 
 
 ---
 
-### Failure Case — Forest Canopy
+### Failure Case — Aerial view of a city
 
 <!-- Replace the placeholder below with your failure case image -->
 <!-- Suggested: original canopy (left) vs reconstruction (right) showing the blur effect -->
