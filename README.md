@@ -2,7 +2,7 @@
 
 > GPU-accelerated partitioned iterated function system (PIFS) image compression with adaptive encoding, compact binary colour coding, and resolution-independent decoding.
 
-**LEWIS KAGIRI** · School of Informatics and Computing · Technical Univesity of Mombasa
+**LEWIS KAGIRI** · School of Informatics and Computing · Technical University of Mombasa
 
 ---
 
@@ -26,7 +26,7 @@ Tested on five image types representing different levels of self-similarity.
 | Architectural render | 40.57 dB | 0.990 | 12.8 KB | 97.8% | Smooth gradients |
 | CCTV footage (grayscale) | 26.01 dB | 0.880 | 112.6 KB | 95.8% | Fisheye distortion |
 | Brick wall | 25.48 dB | 0.672 | 239.9 KB | 93.6% | Lighting gradient |
-| Forest canopy | 20.69 dB | 0.715 | 3418.2KB | 94.4% | Known failure case |
+| Forest canopy | 20.69 dB | 0.715 | 80.2KB | 94.4% | Known failure case |
 
 PSNR above 35 dB is considered good quality for natural photographs. The system performs well on smooth-content images (portraits, architecture, gradients) and fails predictably on high-entropy content (foliage, fine texture) — a failure mode that is theoretically characterised in the paper.
 
@@ -39,7 +39,7 @@ PSNR above 35 dB is considered good quality for natural photographs. The system 
 <!-- Replace the placeholder below with your side-by-side image -->
 <!-- Suggested: original (left) vs v7 reconstruction (right), labelled with PSNR and file size -->
 
-![street movie scene](./assets/street%20movie%20scene.png)
+![Street scene original vs fractal reconstruction](./assets/street%20movie%20scene.png)
 
 ---
 
@@ -48,8 +48,8 @@ PSNR above 35 dB is considered good quality for natural photographs. The system 
 <!-- Replace the placeholder below with your upscale comparison image -->
 <!-- Suggested: three crops at 1×, 2×, 4× from the same .frac file, side by side -->
 
-![street movie scene](./assets/leaf%20upscale%20factor%202.png)
-![street movie scene](./assets/leaf%20upscale%20factor%204.png)
+![Leaf texture 2x upscale from fractal decode](./assets/leaf%20upscale%20factor%202.png)
+![Leaf texture 4x upscale from fractal decode](./assets/leaf%20upscale%20factor%204.png)
 
 ---
 
@@ -58,7 +58,7 @@ PSNR above 35 dB is considered good quality for natural photographs. The system 
 <!-- Replace the placeholder below with your failure case image -->
 <!-- Suggested: original canopy (left) vs reconstruction (right) showing the blur effect -->
 
-![street movie scene](./assets/aerial%20view%20of%20london.png)
+![Aerial view of London fractal reconstruction failure case](./assets/aerial%20view%20of%20london.png)
 
 ---
 
