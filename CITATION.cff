@@ -1,0 +1,52 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata below."
+type: software
+
+title: "GPU Fractal Image Compression"
+abstract: >
+  GPU-accelerated partitioned iterated function system (PIFS) image compression
+  with adaptive encoding, compact binary colour coding, and resolution-independent
+  decoding. Achieves 97.5% compression at 38+ dB PSNR on smooth-content images
+  with encoding times under 15 seconds on an NVIDIA T4 GPU. Includes a theoretical
+  characterisation of the PIFS blur mechanism and a compact binary DCT colour codec
+  reducing colour storage by 97% versus naive serialisation.
+
+authors:
+  - family-names: "Ndegwa"
+    given-names: "Lewis"
+    affiliation: "School of Informatics and Computing, Technical University of Mombasa"
+
+version: "7.0.2"
+date-released: "2026-03-11"
+
+# Replace the date-released value above with today's date in YYYY-MM-DD format
+
+repository-code: "https://github.com/10kwise/gpu-fractal-compression"
+license: GPL-3.0
+
+keywords:
+  - fractal compression
+  - image compression
+  - partitioned iterated function systems
+  - PIFS
+  - GPU acceleration
+  - CuPy
+  - resolution-independent decoding
+  - super-resolution
+  - computer vision
+  - YCbCr
+  - DCT
+
+
+# preferred-citation:
+#   type: article
+#   title: "GPU-Accelerated Fractal Image Compression with Adaptive Encoding and Compact Binary DCT Colour Coding"
+#   authors:
+#     - family-names: "[Your Last Name]"
+#       given-names: "[Your First Name]"
+#       affiliation: "School of Informatics and Computing, [University Name]"
+#     - family-names: "[Supervisor Last Name]"
+#       given-names: "[Supervisor First Name]"
+#       affiliation: "School of Informatics and Computing, [University Name]"
+#   year: 2025
+#   url: "https://arxiv.org/abs/[ARXIV-ID]"
