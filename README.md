@@ -1,186 +1,267 @@
-# GPU Fractal Image Compression
+# GPU-Accelerated Fractal Image Compression
 
-> GPU-accelerated partitioned iterated function system (PIFS) image compression with adaptive encoding, compact binary colour coding, and resolution-independent decoding.
+**A complete Python/CuPy implementation of Partitioned Iterated Function System (PIFS) fractal image compression with resolution-independent decoding, validated on the Kodak-24 benchmark dataset.**
 
-**LEWIS KAGIRI** · School of Informatics and Computing · Technical University of Mombasa
-
----
-
-## What This Is
-
-This system compresses images by describing them as a set of self-similarity rules rather than storing pixels directly. Each region of the image is matched to a similar region elsewhere in the same image. The stored rules are far smaller than the original pixels, and decoding applies the rules iteratively until the image converges — guaranteed by Banach's contraction theorem.
-
-The primary differentiating property over standard codecs (JPEG, WebP) is **resolution-independent decoding**: the same compressed file decodes at 1×, 2×, or 4× resolution without any additional stored data. This makes it suitable for applications where multiple output resolutions are needed from a single source file.
-
-The encoding search — finding the best matching region for each image block — is embarrassingly parallel and maps directly to GPU matrix operations. This system implements the full pipeline in Python/CuPy, reducing encoding time from hours (1990s CPU implementations) to under 15 seconds on an NVIDIA T4 GPU.
+Lewis Kagiri Ndegwa · Dr Tole  
+School of Informatics and Computing, Technical University of Mombasa  
+GPL-3.0 License · March 2026
 
 ---
 
-## Results
+## What this is
 
-Tested on five image types representing different levels of self-similarity.
+This system encodes images as collections of contractive affine mappings between self-similar regions (PIFS). The stored file decodes at any integer scale factor from the same compressed file with no additional stored data — a property no interpolation-based codec can match.
 
-| Image Type | PSNR | SSIM | File Size | Compression | Notes |
-|---|---|---|---|---|---|
-| Street movie scene / portrait | 38.23 dB | 0.983 | 75.7 KB | 97.5% | From 3.0 MB raw |
-| Architectural render | 40.57 dB | 0.990 | 12.8 KB | 97.8% | Smooth gradients |
-| CCTV footage (grayscale) | 26.01 dB | 0.880 | 112.6 KB | 95.8% | Fisheye distortion |
-| Brick wall | 25.48 dB | 0.672 | 239.9 KB | 93.6% | Lighting gradient |
-| Forest canopy | 20.69 dB | 0.715 | 80.2KB | 94.4% | Known failure case |
-
-PSNR above 35 dB is considered good quality for natural photographs. The system performs well on smooth-content images (portraits, architecture, gradients) and fails predictably on high-entropy content (foliage, fine texture) — a failure mode that is theoretically characterised in the paper.
+The core contribution of v7.3 is a **batched GPU encoder** that eliminates the per-block Python loop entirely. All M non-flat range blocks are stacked into a single matrix R ∈ ℝ^(M×64) and transferred to GPU in one operation. The full (M, N) error surface is computed analytically from one batched matrix multiplication R @ D^T, with argmin over N giving the globally optimal transform for all M blocks simultaneously.
 
 ---
 
-## Visual Results
+## Key results
 
-### Compression — Street Scene
+### Compression
 
-<!-- Replace the placeholder below with your side-by-side image -->
-<!-- Suggested: original (left) vs v7 reconstruction (right), labelled with PSNR and file size -->
+| Image | Resolution | PSNR | SSIM | File Size | vs Raw |
+|-------|-----------|------|------|-----------|--------|
+| Portrait photography | 1366×911 | 37.03 dB | 0.963 | 103.4 KB | 97.2% |
+| Architectural render | 626×313 | 40.57 dB | 0.990 | 12.8 KB | 97.8% |
+| Aerial footage | 1280×720 | 26.02 dB | 0.880 | 112.6 KB | 95.8% |
+| Brick wall | 1500×844 | 25.48 dB | 0.672 | 239.9 KB | 93.6% |
+| Forest canopy | 999×666 | 20.70 dB | 0.727 | 172.1 KB | 91.3% |
 
-![Street scene original vs fractal reconstruction](./assets/street%20movie%20scene.png)
+**Kodak-24 dataset:** mean PSNR 26.61 ± 2.61 dB, mean SSIM 0.791 ± 0.077, compression 92.7–95.7% across 24 images.
 
----
+### Resolution-independent upscaling
 
-### Resolution-Independent Decoding — Same File, Scale to 2x and 4x
+The same `.frac` file decodes at 1×, 2×, 4×, 8×, or 10× with no additional stored data. Validated across 10 Kodak images against bicubic and Lanczos at equal storage budget (round-trip methodology):
 
-<!-- Replace the placeholder below with your upscale comparison image -->
-<!-- Suggested: three crops at 1×, 2×, 4× from the same .frac file, side by side -->
+| Scale | Fractal wins | Mean Δ PSNR |
+|-------|-------------|-------------|
+| 2× | 0/10 | −0.89 dB |
+| 4× | 10/10 | +2.46 dB |
+| 8× | 10/10 | +4.52 dB |
+| 10× | 10/10 | +5.02 dB |
 
-![Leaf texture 2x upscale from fractal decode](./assets/leaf%20upscale%20factor%202.png)
-![Leaf texture 4x upscale from fractal decode](./assets/leaf%20upscale%20factor%204.png)
+Crossover between 2× and 4× is consistent across all 10 images without exception. Fractal quality is stable from 4× onward (varies < 0.04 dB from 4× to 10×). Interpolation degrades monotonically as the storage budget for the downscaled baseline becomes insufficient.
 
----
+### Encode speed (NVIDIA T4, v7.3 batched encoder)
 
-### Failure Case — Aerial view of a city
-
-<!-- Replace the placeholder below with your failure case image -->
-<!-- Suggested: original canopy (left) vs reconstruction (right) showing the blur effect -->
-
-![Aerial view of London fractal reconstruction failure case](./assets/aerial%20view%20of%20london.png)
-
----
-
-## Key Technical Findings
-
-**Why fractal compression blurs — and when it does not.**
-The mandatory 2× downsampling of domain blocks during encoding is a lowpass filter. Every decode iteration applies this filter, causing sharpness to decay by a factor of 4× per iteration. After 10 iterations, sharpness is 10⁻⁶ of the original. Images dominated by smooth gradients (portraits, sky, architectural surfaces) contain little high-frequency content to lose. Images with fine detail (foliage, fabric, brick texture) are dominated by high frequencies that this filter destroys. This analysis correctly predicts performance across all five benchmark images and is the primary theoretical contribution of this work.
-
-**Colour channel overhead eliminated.**
-Prior implementations stored DCT colour coefficients as Python objects, adding ~28× serialisation overhead (415 KB for data containing ~15 KB of information). A compact variable-length binary codec stores only the nonzero zigzag coefficients per block, zlib-compressed. Colour storage reduced from 415 KB to 10 KB with no change in reconstruction quality.
-
-**Bugs identified and corrected in the binary format.**
-Three defects were found and fixed: a signed 8-bit brightness field that clipped bright image regions (fixed to unsigned [0,255]); a 5-bit coordinate field that overflowed on images taller than 2016 pixels (expanded to 6-bit, supporting 4048 px); and a variance-grouping optimisation that provided zero speedup due to grouping by the wrong criterion (removed).
+| Image | Encode time |
+|-------|------------|
+| Portrait 1366×911 | 0.7 s |
+| Arch render 626×313 | 0.2 s |
+| Aerial 1280×720 | 0.5 s |
+| Brick wall 1500×844 | 0.7 s |
+| Forest canopy 999×666 | 1.3 s |
 
 ---
 
-## How to Run
+## Architecture
 
-The system runs entirely in Google Colab — no local GPU required.
+```
+RGB Input
+    │
+    ▼
+Pad to 8px multiple → RGB to YCbCr
+    │
+    ▼
+Image Analysis
+  · block variance across all 8×8 range blocks
+  · flat block detection (bottom 5th percentile, capped at variance=50)
+  · τ = 0.50 × median(non-flat block variance)   ← post-hoc classifier, not search terminator
+  · auto domain step from image dimensions
+    │
+    ▼
+Pre-sample Diagnostic
+  · 5% stratified sample across low/mid/high variance buckets
+  · estimates match success rate before full encode
+    │
+    ▼
+Build Domain Stack  D ∈ ℝ^(N×64)
+  · all domain positions × 8 D4 transforms (4 rotations × horizontal flip)
+  · single host→GPU transfer
+    │
+    ▼
+Batched GPU Encode Y channel
+  · R ∈ ℝ^(M×64) — all non-flat range blocks, single transfer
+  · errors = R @ D^T  →  analytical c, b for all (M,N) pairs
+  · argmin over N → globally optimal transform per block
+  · contractivity clamp: c ∈ [−0.75, 0.75]
+    │
+    ▼
+Compact DCT Encode Cb, Cr
+  · 8×8 DCT with JPEG chroma quantisation table
+  · variable-length zigzag prefix + zlib compression
+  · 4–14 KB per image; 0 KB for greyscale content
+    │
+    ▼
+Write .frac v7 binary
+  · 4 bytes per transform: [cy:6][cx:6][ti:3][contrast_q:8][brightness:8]
+  · file size = n_blocks × 4 + colour streams  (invariant to domain step)
+    │
+    ▼
+Decode at any scale
+  · IFS iterate 10× from flat grey initial image
+  · decode time scales sublinearly with output area
+```
 
-**1. Open the notebook**
+---
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/10kwise/gpu-fractal-compression/blob/main/notebooks/fractal_compress_v7_2.ipynb)
+## Design properties verified empirically
 
-<!-- Replace [YOUR-USERNAME] with your actual GitHub username in the link above -->
+**τ is a post-hoc classifier, not a quality control parameter.** The encoder always evaluates all N domain candidates and stores the global argmin regardless of threshold value. τ only classifies whether the optimal match fell below threshold for the match success rate counter. PSNR is invariant to the threshold multiplier k across k ∈ {0.1…0.8} — confirmed on three images with varying content class.
 
-**2. Set your image path and time budget**
+**File size is invariant to domain step.** The output stores exactly one 4-byte transform per 8×8 range block regardless of search density. Domain step controls how many candidates are evaluated, not how many transforms are stored. Halving the candidate pool (step 16→32) costs 0.62–0.69 dB PSNR at no file size penalty across four content classes.
+
+**Residual second-pass encoding does not improve quality.** Evaluated across 24 Kodak images: mean ΔPSNR = −0.002 dB. The post-encoding error lacks exploitable self-similar structure; the second pass finds no useful matches in the same domain pool. The feature is retained in the codebase as it corrects localised grey-patch artefacts in a small number of high-contrast blocks.
+
+---
+
+## Installation
+
+```bash
+# Google Colab (recommended — T4 GPU included)
+!pip install cupy-cuda12x scipy scikit-image -q
+
+# Local with CUDA 12
+pip install cupy-cuda12x scipy scikit-image pillow
+```
+
+No other dependencies. Falls back to NumPy (CPU) automatically if CuPy is unavailable.
+
+---
+
+## Usage
+
+### Encode
 
 ```python
-IMAGE_PATH          = '/content/your_image.jpg'   # path to your image in Colab
-TIME_BUDGET_SECONDS = 120                          # encoding time limit
-COMPRESSION_MODE    = 'LOSSY'                      # 'LOSSY' or 'LOSSLESS'
-ENCODE              = True                         # True to encode, False to decode only
+IMAGE_PATH  = '/content/your_image.png'
+OUTPUT_PATH = '/content/output.frac'
+ENCODE      = True
+
+# Run Cell B (Main Pipeline) in fractal_compress_v7_3.ipynb
 ```
 
-**3. Run all cells**
+### Decode at any scale
 
-The pipeline runs automatically: analysis → pre-sample diagnostic → GPU encode → save `.frac` file → decode → quality metrics.
+```python
+# Standard decode (1×)
+y_rec = decode_fractal(y_tf, (H_pad, W_pad), n_iterations=10)
 
-**Requirements** (installed automatically in Colab):
-
+# Upscale decode (same file, no extra data)
+recon_4x = decode_and_upscale(y_tf, cb_enc, cr_enc,
+                               padded_shape, orig_shape,
+                               scale=4, n_i=12)
 ```
-cupy-cuda12x
-scipy
-Pillow
-numpy
-```
 
----
+### Key configuration (Cell A3)
 
-## Project Structure
-
-```
-gpu-fractal-compression/
-├── notebooks/
-│   └── fractal_compress_v7.ipynb   # Main notebook — full pipeline
-├── assets/
-│   └── [benchmark images]          # Original and reconstructed images
-├── README.md
-├── LICENSE                         # GPL-3.0
-└── CITATION.cff
+```python
+AUTO_THRESHOLD      = True    # derive τ from image variance automatically
+TIME_BUDGET_SECONDS = 120     # influences auto domain step selection
+ENCODE_RESIDUAL     = True    # second pass (ineffective on average — see paper)
+DCT_QUALITY_FACTOR  = 1.0     # colour encoder quality (lower = larger file)
 ```
 
 ---
 
-## File Format
+## Notebook structure
 
-Compressed images are saved as `.frac` files (version 7). Each transform is packed into 4 bytes:
+| Cell | Purpose |
+|------|---------|
+| A1 | Setup — pip install, GPU check |
+| A2 | Imports and GPU detection |
+| A3 | Configuration |
+| A4 | YCbCr colour space and padding |
+| A5 | Fractal helpers (downsample_2x, D4 transforms) |
+| A6 | Image analysis and adaptive parameter selection |
+| A7 | Pre-sample diagnostic |
+| A8 | Batched GPU encoder (v7.3) |
+| A9 | Fractal decoders (standard + upscale) |
+| A10 | Residual encoding (gated) |
+| A11 | Compact binary DCT colour encoder |
+| A12 | Save / Load (.frac v7 binary format) |
+| A13 | Utilities (metrics, display, size report) |
+| B | Main pipeline — encode or decode a single image |
+| C1 | Upscaling comparison (round-trip evaluation) |
+| C2 | JPEG comparison at matched file size |
+| C3 | Rate-distortion benchmark |
+| D1 | Kodak-24 dataset evaluation |
+| D2 | Threshold multiplier sweep |
+| D3 | Residual gate justification |
+| D4 | Dataset upscaling comparison (Kodak subset) |
+| D5 | Domain step sweep with decode timing |
+
+---
+
+## .frac v7 binary format
 
 ```
-[ cy : 6 bits ][ cx : 6 bits ][ ti : 3 bits ][ contrast : 8 bits ][ brightness : 8 bits ]
+Header (29 bytes):
+  4B  magic: 'FRAC'
+  4B  version: 7
+  4B  padded H
+  4B  padded W
+  4B  original H
+  4B  original W
+  4B  n_transforms
+  4B  domain_step
+  1B  colour_mode (0=LOSSY, 1=LOSSLESS)
+  1B  has_residual
+
+Per transform (4 bytes):
+  [cy:6][cx:6][ti:3][contrast_q:8][brightness:8]
+  cy, cx: domain block index (not pixel coordinate)
+  ti:     D4 transform index 0–7
+  contrast_q: stored as uint8 via cq + 127
+  brightness: uint8 in [0, 255]
+
+Colour streams:
+  cb_blob (length stored in header)
+  cr_blob (length stored in header)
 ```
 
-Supports images up to 4048 × 4048 pixels at maximum domain step. Colour channels stored as variable-length binary DCT + zlib. The format is fully documented in the notebook and in the paper (see Citation).
+File size = 29 + n\_blocks × 4 + len(cb\_blob) + len(cr\_blob)  
+where n\_blocks = (H\_pad ÷ 8) × (W\_pad ÷ 8), invariant to domain step.
 
 ---
 
-## Limitations
+## Known limitations
 
-This system is not a general replacement for JPEG or WebP. JPEG achieves comparable quality at 3–4× smaller file sizes on most images. The correct framing is:
+- **Quality on high-entropy content.** Images with median block variance > 400 (dense foliage, crowds, complex textures) average 22.4 dB PSNR. The domain pool contains no structurally similar candidates for fine texture; this is an attractor mismatch, not a search failure. A denser domain pool at step=8 on the forest canopy image produced 1.9% match success and 20.69 dB PSNR — 0.01 dB better than step=16.
 
-- **Use fractal** when resolution-independence matters — multiple output resolutions from one file, game engine texture streaming, super-resolution pipelines on smooth content.
-- **Use JPEG/WebP** for general-purpose image compression where file size efficiency is the primary goal.
-- **Do not use fractal** on high-entropy content (foliage, fine fabric, complex textures) — the lowpass filter characteristic will produce visibly blurred results regardless of settings.
+- **Python/CuPy prototype.** Encode times are for an interpreted implementation. An optimised CUDA C++ system would be substantially faster.
 
-The pre-sample diagnostic at the start of each encode predicts this automatically and warns when an image is a poor candidate.
+- **Rate-distortion vs transform codecs.** PIFS does not compete with JPEG, WebP, or HEIC on rate-distortion for photographic content. The system's advantage is resolution independence, not compression efficiency at 1×.
 
----
-
-## Roadmap
-
-- [x] GPU-accelerated PIFS encoder (v7)
-- [x] Compact binary DCT colour codec
-- [x] Adaptive auto-threshold via pre-sampling
-- [x] Resolution-independent 2× and 4× decoder
-- [x] Corrected binary .frac file format
-- [ ] Rigorous upscaling benchmark vs bicubic / Lanczos / EDSR
+- **Decode time grows with scale.** Decode is sublinear but not constant: 4× output scale requires approximately 2.9× more decode time than 1× (measured across four images). 10× outputs take 10–20 seconds on T4.
 
 ---
 
-## Citation
-
-If you use this work, please cite:
+## Citing this work
 
 ```bibtex
-@software{Ndegwa_2026_gpu_fractal,
-  author    = {Lewis Kagiri Ndegwa},
-  title     = {GPU Fractal Image Compression},
-  year      = {2026},
-  publisher = {GitHub},
-  url       = {https://github.com/10kwise/GPU-fractal-compression}
+@misc{ndegwa2026fractal,
+  title   = {GPU-Accelerated Fractal Image Compression with Adaptive Encoding,
+             Compact Colour Coding, and Resolution-Independent Upscaling},
+  author  = {Ndegwa, Lewis Kagiri and Tole},
+  year    = {2026},
+  month   = {March},
+  url     = {https://github.com/10kwise/GPU-fractal-compression},
+  note    = {Technical University of Mombasa, GPL-3.0}
 }
 ```
 
-A full academic citation will be available once the accompanying paper is published. See `CITATION.cff` for machine-readable citation metadata.
-
 ---
 
-## Licence
+## References
 
-This project is licensed under the **GNU General Public License v3.0**.
-
-You are free to use, study, modify, and distribute this work. Any derivative work must also be distributed under the same licence. See [`LICENSE`](LICENSE) for the full terms.
-
-© [2026] [Lewis Kagiri Ndegwa]
+1. Barnsley, M. F., & Sloan, A. D. (1988). A better way to compress images. *Byte Magazine*, 13(1), 215–223.
+2. Jacquin, A. E. (1992). Image coding based on a fractal theory of iterated contractive image transformations. *IEEE Transactions on Image Processing*, 1(1), 18–30.
+3. Fisher, Y. (Ed.). (1995). *Fractal Image Compression: Theory and Application*. Springer-Verlag.
+4. Haque et al. (2014). GPU accelerated fractal image compression for medical imaging. arXiv:1404.0774.
+5. Al Sideiri et al. (2020). CUDA implementation of fractal image compression. *Journal of Real-Time Image Processing*, 17(5), 1375–1387.
+6. Hernandez-Lopez & Muñiz-Pérez (2022). Parallel fractal image compression using quadtree partition. *Journal of Real-Time Image Processing*, 19, 117–130.
+7. Wohlberg, B., & De Jager, G. (1999). A review of the fractal image coding literature. *IEEE Transactions on Image Processing*, 8(12), 1716–1729.
+8. Li, M., & U, K. T. (2025). An enhanced fractal image compression algorithm based on adaptive non-uniform rectangular partition. *Electronics*, 14(13), 2550.
+9. Wang et al. (2004). Image quality assessment: From error visibility to structural similarity. *IEEE Transactions on Image Processing*, 13(4), 600–612.
