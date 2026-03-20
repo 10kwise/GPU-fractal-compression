@@ -1,16 +1,16 @@
-# GPU-Accelerated Fractal Image Compression
+# GPU-Accelerated Fractal Image Compression with Adaptive Encoding, Compact Colour Coding, and Resolution-Independent Upscaling
 
 **A complete Python/CuPy implementation of Partitioned Iterated Function System (PIFS) fractal image compression with resolution-independent decoding, validated on the Kodak-24 benchmark dataset.**
 
-Lewis Kagiri Ndegwa · Dr Tole  
+Lewis Kagiri Ndegwa · Dr. Tole  
 School of Informatics and Computing, Technical University of Mombasa  
 GPL-3.0 License · March 2026
 
 ---
 
-## What this is
+## Abstract / What this is
 
-This system encodes images as collections of contractive affine mappings between self-similar regions (PIFS). The stored file decodes at any integer scale factor from the same compressed file with no additional stored data — a property no interpolation-based codec can match.
+This system encodes images as collections of contractive affine mappings between self-similar regions (PIFS). The stored file decodes at any integer scale factor from the same compressed file with no additional stored data — a property no interpolation-based codec can match. It incorporates **automatic parameter selection**, a **stratified pre-sample diagnostic**, and a **compact binary DCT colour encoder**. 
 
 The core contribution of v7.3 is a **batched GPU encoder** that eliminates the per-block Python loop entirely. All M non-flat range blocks are stacked into a single matrix R ∈ ℝ^(M×64) and transferred to GPU in one operation. The full (M, N) error surface is computed analytically from one batched matrix multiplication R @ D^T, with argmin over N giving the globally optimal transform for all M blocks simultaneously.
 
@@ -30,6 +30,17 @@ The core contribution of v7.3 is a **batched GPU encoder** that eliminates the p
 
 **Kodak-24 dataset:** mean PSNR 26.61 ± 2.61 dB, mean SSIM 0.791 ± 0.077, compression 92.7–95.7% across 24 images.
 
+### Visual Results
+
+![Portrait photography](assets/portrait%20scene.png)  
+*Fig 2a. Portrait photography — original (left) vs. decoded (right). PSNR 37.03 dB, SSIM 0.963, 103.4 KB (97.2% compression).*
+
+![Aerial footage](assets/aerial%20view%20of%20london.png)  
+*Fig 2c. Aerial footage — original (left) vs. decoded (right). PSNR 26.02 dB, SSIM 0.880, 112.6 KB (95.8% compression).*
+
+![Brick wall](assets/brick%20wall.png)  
+*Fig 2d. Brick wall — original (left) vs. decoded (right). PSNR 25.48 dB, SSIM 0.672, 239.9 KB (93.6% compression).*
+
 ### Resolution-independent upscaling
 
 The same `.frac` file decodes at 1×, 2×, 4×, 8×, or 10× with no additional stored data. Validated across 10 Kodak images against bicubic and Lanczos at equal storage budget (round-trip methodology):
@@ -42,6 +53,10 @@ The same `.frac` file decodes at 1×, 2×, 4×, 8×, or 10× with no additional 
 | 10× | 10/10 | +5.02 dB |
 
 Crossover between 2× and 4× is consistent across all 10 images without exception. Fractal quality is stable from 4× onward (varies < 0.04 dB from 4× to 10×). Interpolation degrades monotonically as the storage budget for the downscaled baseline becomes insufficient.
+
+![Forest canopy upscale 2x](assets/leaf%20upscale%20factor%202.png)  
+![Forest canopy upscale 4x](assets/leaf%20upscale%20factor%204.png)  
+*Forest canopy upscaled at 2× and 4× using fractal decoding.*
 
 ### Encode speed (NVIDIA T4, v7.3 batched encoder)
 
@@ -113,6 +128,9 @@ Decode at any scale
 **File size is invariant to domain step.** The output stores exactly one 4-byte transform per 8×8 range block regardless of search density. Domain step controls how many candidates are evaluated, not how many transforms are stored. Halving the candidate pool (step 16→32) costs 0.62–0.69 dB PSNR at no file size penalty across four content classes.
 
 **Residual second-pass encoding does not improve quality.** Evaluated across 24 Kodak images: mean ΔPSNR = −0.002 dB. The post-encoding error lacks exploitable self-similar structure; the second pass finds no useful matches in the same domain pool. The feature is retained in the codebase as it corrects localised grey-patch artefacts in a small number of high-contrast blocks.
+
+![Residual fix on portrait](assets/encode%20residual%20on%20portrait.png)  
+*Visual inspection isolated high-contrast blocks where the residual pass occasionally corrected a flat grey patch artefact.*
 
 ---
 
@@ -263,5 +281,8 @@ where n\_blocks = (H\_pad ÷ 8) × (W\_pad ÷ 8), invariant to domain step.
 5. Al Sideiri et al. (2020). CUDA implementation of fractal image compression. *Journal of Real-Time Image Processing*, 17(5), 1375–1387.
 6. Hernandez-Lopez & Muñiz-Pérez (2022). Parallel fractal image compression using quadtree partition. *Journal of Real-Time Image Processing*, 19, 117–130.
 7. Wohlberg, B., & De Jager, G. (1999). A review of the fractal image coding literature. *IEEE Transactions on Image Processing*, 8(12), 1716–1729.
-8. Li, M., & U, K. T. (2025). An enhanced fractal image compression algorithm based on adaptive non-uniform rectangular partition. *Electronics*, 14(13), 2550.
-9. Wang et al. (2004). Image quality assessment: From error visibility to structural similarity. *IEEE Transactions on Image Processing*, 13(4), 600–612.
+8. Bhattacharya, N., & Bhattacharya, M. (2004). Fractal image compression: A randomized approach. *Pattern Recognition Letters*, 25(10), 1167–1180.
+9. Li, M., & U, K. T. (2025). An enhanced fractal image compression algorithm based on adaptive non-uniform rectangular partition. *Electronics*, 14(13), 2550.
+10. Gilli, G., & Saupe, D. (2000). Adaptive post-processing for fractal image compression. *Proceedings IEEE ICIP*.
+11. Kodak Lossless True Color Image Suite. Available: http://r0k.us/graphics/kodak/
+12. Wang, Z., Bovik, A. C., Sheikh, H. R., & Simoncelli, E. P. (2004). Image quality assessment: From error visibility to structural similarity. *IEEE Transactions on Image Processing*, 13(4), 600–612.
