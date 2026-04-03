@@ -2,7 +2,7 @@
 
 **A complete Python/CuPy implementation of Partitioned Iterated Function System (PIFS) fractal image compression with resolution-independent decoding, validated on the Kodak-24 benchmark dataset.**
 
-Lewis Kagiri Ndegwa · Dr. Tole  
+Lewis Kagiri Ndegwa 
 School of Informatics and Computing, Technical University of Mombasa  
 GPL-3.0 License · March 2026
 
